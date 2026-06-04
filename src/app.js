@@ -407,7 +407,10 @@ async function showDetail(id) {
       ${e.notiz}
     </div>` : ''}
     <div class="photo-strip" id="detail-photo-strip"></div>
-    <div style="display:flex;gap:8px;margin-top:16px">
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="shareEntry('${e.id}')">
+        <i class="ti ti-share"></i> Teilen
+      </button>
       <button class="btn btn-ghost btn-sm" onclick="editEntry('${e.id}')">
         <i class="ti ti-edit"></i> Bearbeiten
       </button>
@@ -445,6 +448,95 @@ function openPhotoViewer(index) {
 function closePhotoViewer() {
   document.getElementById('photo-viewer').classList.remove('open');
   document.getElementById('photo-viewer-img').src = '';
+}
+
+// ---- TEILEN (Web Share API + Clipboard-Fallback) ----
+
+// Baut die Text-Zusammenfassung eines Eintrags.
+function buildShareText(e) {
+  const fz = getFz(e.fz);
+  const lines = [
+    e.name,
+    `Fahrzeug: ${fz ? fz.name : '–'}`,
+    `Kategorie: ${e.kat}`,
+    `Kosten: CHF ${fmtChf(e.kosten)}`,
+    `Datum: ${formatDate(e.datum)}`,
+  ];
+  if (e.notiz) lines.push(`Notizen: ${e.notiz}`);
+  return lines.join('\n');
+}
+
+async function shareEntry(id) {
+  const e = dbGetEintraege().find(x => x.id === id);
+  if (!e) return;
+
+  const text = buildShareText(e);
+  const shareData = { title: `ModLog – ${e.name}`, text };
+
+  // Erstes Foto (falls vorhanden) als Datei vorbereiten.
+  let file = null;
+  if (detailPhotos && detailPhotos.length) {
+    try {
+      const blob = await (await fetch(detailPhotos[0].data)).blob();
+      file = new File([blob], 'modlog.jpg', { type: blob.type || 'image/jpeg' });
+    } catch (_) { file = null; }
+  }
+
+  // 1) Mit Foto teilen, wenn der Browser File-Sharing unterstützt.
+  if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ ...shareData, files: [file] });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;  // Nutzer hat abgebrochen
+      // sonst: weiter zum Text-Share
+    }
+  }
+
+  // 2) Nur Text teilen.
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      // sonst: Fallback
+    }
+  }
+
+  // 3) Fallback: in die Zwischenablage kopieren + Toast.
+  await copyToClipboard(text);
+  showToast('In die Zwischenablage kopiert');
+}
+
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch (_) { /* fällt auf execCommand zurück */ }
+
+  // Legacy-Fallback (kein position:fixed — temporäres Off-Screen-Textfeld).
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'absolute';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (_) { /* ignore */ }
+  document.body.removeChild(ta);
+}
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
 // ---- ADD / EDIT ----

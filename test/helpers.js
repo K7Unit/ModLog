@@ -52,4 +52,59 @@ function loadDb() {
   return ctx;
 }
 
-module.exports = { loadDb };
+const APP_SRC = path.join(__dirname, '..', 'src', 'app.js');
+
+// Generisches Fake-DOM-Element: schluckt beliebige Property-Zugriffe und
+// Methodenaufrufe, damit das browser-orientierte app.js unter Node lädt.
+function makeFakeEl() {
+  return {
+    innerHTML: '', textContent: '', value: '', src: '',
+    style: {}, dataset: {},
+    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+    setAttribute() {}, removeAttribute() {}, focus() {}, select() {}, click() {},
+    appendChild() {}, removeChild() {}, addEventListener() {},
+    querySelectorAll() { return []; },
+  };
+}
+
+/**
+ * Lädt db.js + app.js zusammen in einen isolierten Kontext mit DOM-Stubs.
+ * Für Tests der app.js-Logik (z.B. Share/Clipboard-Fallback). Browser-APIs
+ * werden minimal gestubbt; `navigator` kann pro Test überschrieben werden.
+ * @returns {object} Kontext mit allen Funktionen aus db.js und app.js.
+ */
+function loadApp() {
+  const storage = {};
+  const localStorage = {
+    getItem: k => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
+    setItem: (k, v) => { storage[k] = String(v); },
+    removeItem: k => { delete storage[k]; },
+  };
+
+  const document = {
+    getElementById: () => makeFakeEl(),
+    createElement: () => makeFakeEl(),
+    querySelectorAll: () => [],
+    body: makeFakeEl(),
+    addEventListener() {},
+  };
+
+  const ctx = {
+    localStorage,
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    console,
+    alert: () => {},
+    document,
+    window: { addEventListener() {}, scrollTo() {} },
+    navigator: {},               // pro Test überschreibbar (z.B. ohne .share)
+    setTimeout, clearTimeout,
+  };
+
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(DB_SRC, 'utf8'), ctx, { filename: 'src/db.js' });
+  vm.runInContext(fs.readFileSync(APP_SRC, 'utf8'), ctx, { filename: 'src/app.js' });
+  return ctx;
+}
+
+module.exports = { loadDb, loadApp };

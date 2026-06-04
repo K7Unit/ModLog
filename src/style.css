@@ -290,6 +290,28 @@ body {
 .year-select:focus { border-color: var(--accent); }
 .year-select option { background: var(--bg2); }
 
+/* ---- TOAST ---- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 88px;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px 16px;
+  border-radius: var(--r);
+  z-index: 500;
+  opacity: 0;
+  pointer-events: none;
+  max-width: 90vw;
+  text-align: center;
+  transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* ---- VEHICLE SELECTOR ---- */
 .vehicle-row {
   display: flex;
