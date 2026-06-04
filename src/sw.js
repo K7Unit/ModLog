@@ -8,7 +8,7 @@
  * Event alte Caches aufräumt.
  */
 
-const CACHE = 'modlog-v4';
+const CACHE = 'modlog-v5';
 
 const ASSETS = [
   './',
@@ -16,6 +16,7 @@ const ASSETS = [
   './style.css',
   './db.js',
   './qr.js',
+  './qr-decode.js',
   './app.js',
   './manifest.json',
   './icons/icon-180.png',

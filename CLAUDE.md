@@ -16,6 +16,7 @@ src/
   db.js        — Daten-Layer (localStorage + IndexedDB). Wird im <head> geladen
                  (setzt Theme vor dem ersten Paint, kein FOUC).
   qr.js        — Vendored QR-Encoder (selbstständig, MIT, keine Laufzeit-Dep).
+  qr-decode.js — Vendored QR-Decoder (Scan/Import; selbstständig, MIT, keine Dep).
   app.js       — UI-Logik (Rendering, Events, Modals)
 test/          — Node-Tests (node:test + fake-indexeddb; QR via qrcode/jsqr, devDeps)
 ```
@@ -26,7 +27,7 @@ test/          — Node-Tests (node:test + fake-indexeddb; QR via qrcode/jsqr, d
 - `app.js` ruft nur `db*`-Funktionen auf (z.B. `dbAddEintrag`, `dbGetFahrzeuge`).
 - Neue Features → neue `db*`-Funktion in `db.js` + UI in `app.js`.
 - Keine externen **Laufzeit**-Libraries. CDN-Links: nur Google Fonts + Tabler Icons.
-  Der QR-Encoder ist lokal in `src/qr.js` vendored (kein CDN/npm zur Laufzeit).
+  QR-Encoder (`src/qr.js`) und -Decoder (`src/qr-decode.js`) sind lokal vendored (kein CDN/npm zur Laufzeit).
   Test-Deps (fake-indexeddb, qrcode, jsqr) bleiben devDependencies und werden nie ausgeliefert.
 
 ## Design-System
@@ -84,7 +85,7 @@ Priorisiert nach Nützlichkeit:
 
 ### Low Priority / Nice to have
 - [x] **Dark/Light-Mode-Toggle** — `[data-theme="light"]` auf `<html>`, Umschalter in der Topbar, persistiert in `modlog_theme_v1` (eigener Key, getrennt von App-Daten). Default dark; `prefers-color-scheme: light` nur als Erst-Fallback.
-- [x] **QR-Code** — Fahrzeug-Setup (Meta + Mods, OHNE Fotos) als QR teilen. Encoder lokal vendored in `src/qr.js` (selbstständig, MIT, keine Laufzeit-Abhängigkeit). Zu grosse Listen werden gekürzt (truncated). Nur Teilen/Anzeigen — Scan-/Import-Flow ist Zukunftsarbeit.
+- [x] **QR-Code** — Fahrzeug-Setup (Meta + Mods, OHNE Fotos) als QR teilen UND importieren (voller Round-Trip). Encoder in `src/qr.js`, Decoder in `src/qr-decode.js` (beide selbstständig, MIT, keine Laufzeit-Abhängigkeit). Import: Kamera-Scan (getUserMedia, in-flow Overlay) mit Paste-Fallback → Vorschau → `dbImportVehicle` (frische ids; 'neu' oder 'zusammenfuehren'). Zu grosse Listen werden beim Teilen gekürzt (truncated).
 - [ ] **IndexedDB Migration** — Für grössere Datensätze
 - [ ] **Backup/Restore** — JSON-Export + Import
 

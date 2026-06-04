@@ -661,6 +661,25 @@ function importErrorMsg(err) {
   return (err && map[err.code]) || 'Import fehlgeschlagen.';
 }
 
+let _camStream = null;     // aktiver getUserMedia-Stream
+let _camRAF = null;        // requestAnimationFrame-Handle des Scan-Loops
+let _scanCanvas = null;    // Offscreen-Canvas für Frame-Abtastung
+
+// Einstieg: bevorzugt Kamera-Scan, mit Paste-Fallback.
+function openImportScan() {
+  importParsed = null;
+  document.getElementById('import-viewer').classList.add('open');
+  window.scrollTo(0, 0);
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    renderImportScan();
+    startCamera();
+  } else {
+    renderImportPaste();
+    showToast('Kamera nicht verfügbar – bitte JSON einfügen.');
+  }
+}
+
+// Einstieg direkt in den Paste-Modus.
 function openImport() {
   importParsed = null;
   renderImportPaste();
@@ -669,7 +688,86 @@ function openImport() {
 }
 
 function closeImport() {
+  stopCamera();
   document.getElementById('import-viewer').classList.remove('open');
+}
+
+function renderImportScan() {
+  document.getElementById('import-title').textContent = '// QR SCANNEN';
+  document.getElementById('import-body').innerHTML = `
+    <div class="scan-frame"><video id="import-video" playsinline muted></video></div>
+    <div class="import-hint">Halte den geteilten QR-Code des Fahrzeug-Setups in den Rahmen.</div>
+    <div class="field-row">
+      <button class="btn btn-ghost btn-full" onclick="switchToPaste()">
+        <i class="ti ti-clipboard"></i> JSON einfügen
+      </button>
+      <button class="btn btn-ghost btn-full" onclick="closeImport()">Abbrechen</button>
+    </div>`;
+}
+
+function switchToPaste() {
+  stopCamera();
+  renderImportPaste();
+}
+
+function startCamera() {
+  const video = document.getElementById('import-video');
+  if (!video) return;
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    .then(stream => {
+      _camStream = stream;
+      video.srcObject = stream;
+      return video.play();
+    })
+    .then(() => scanLoop())
+    .catch(() => {
+      stopCamera();
+      renderImportPaste();
+      showToast('Kein Kamerazugriff – bitte JSON einfügen.');
+    });
+}
+
+function scanLoop() {
+  const video = document.getElementById('import-video');
+  if (!_camStream || !video) return;
+  if (video.readyState >= 2 && video.videoWidth) {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const f = Math.min(1, 640 / Math.max(vw, vh));   // für Performance herunterskalieren
+    const cw = Math.round(vw * f), ch = Math.round(vh * f);
+    _scanCanvas = _scanCanvas || document.createElement('canvas');
+    _scanCanvas.width = cw; _scanCanvas.height = ch;
+    const ctx = _scanCanvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, cw, ch);
+    let text = null;
+    try {
+      const img = ctx.getImageData(0, 0, cw, ch);
+      text = QRDecode.decodeImage(img.data, cw, ch);
+    } catch (_) { /* Frame übersprungen */ }
+    if (text !== null) { onScanResult(text); return; }
+  }
+  _camRAF = requestAnimationFrame(scanLoop);
+}
+
+function onScanResult(text) {
+  stopCamera();
+  let parsed;
+  try {
+    parsed = dbParseQrPayload(text);
+  } catch (err) {
+    renderImportPaste();
+    showToast(importErrorMsg(err));
+    return;
+  }
+  importParsed = parsed;
+  renderImportPreview();
+}
+
+// Kamera-Stream IMMER vollständig freigeben (keine baumelnden Handles).
+function stopCamera() {
+  if (_camRAF) { cancelAnimationFrame(_camRAF); _camRAF = null; }
+  if (_camStream) { _camStream.getTracks().forEach(t => t.stop()); _camStream = null; }
+  const video = document.getElementById('import-video');
+  if (video) video.srcObject = null;
 }
 
 function renderImportPaste() {
