@@ -215,6 +215,36 @@ function renderStats() {
         </div>`).join('')
       : '<div style="color:var(--text3);font-size:12px;text-align:center;padding:12px">Keine Daten</div>'
     );
+
+  // Export-Button-Label an aktiven Fahrzeugfilter anpassen
+  const exportLabel = document.getElementById('export-label');
+  if (exportLabel) {
+    exportLabel.textContent = activeFz !== 'all'
+      ? `CSV exportieren (${getFzKuerzel(activeFz)})`
+      : 'CSV exportieren (alle)';
+  }
+}
+
+// ---- CSV-EXPORT ----
+
+function exportCsv() {
+  const entries = dbGetEintraege(activeFz !== 'all' ? { fz: activeFz } : {});
+  if (!entries.length) {
+    alert('Keine Einträge zum Exportieren.');
+    return;
+  }
+
+  const csv = dbExportCsv(activeFz);
+  // BOM-Prefix (%EF%BB%BF) sorgt dafür dass Excel/Numbers UTF-8 erkennt.
+  const uri = 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(csv);
+
+  const fzPart = activeFz !== 'all' ? '_' + (getFzKuerzel(activeFz) || 'fz') : '';
+  const a = document.createElement('a');
+  a.href = uri;
+  a.download = `modlog${fzPart}_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // ---- FAHRZEUGE ----

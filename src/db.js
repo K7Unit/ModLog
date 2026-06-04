@@ -159,6 +159,37 @@ function dbKostenNachKat() {
   return result;
 }
 
+// ---- CSV-Export ----
+
+/**
+ * Baut eine CSV-Repräsentation der Einträge (UTF-8, CRLF, RFC-4180-Escaping).
+ * Kosten/Kilometerstand bleiben als rohe Zahlen, damit Excel/Numbers sie
+ * als Zahl erkennt (kein Schweizer Tausender-Apostroph im Export).
+ * @param {string} [fzId] Optional auf ein Fahrzeug filtern ('all' = alle).
+ * @returns {string} CSV-Text ohne BOM.
+ */
+function dbExportCsv(fzId) {
+  const list = dbGetEintraege(fzId && fzId !== 'all' ? { fz: fzId } : {});
+  const cols = ['Fahrzeug', 'Bezeichnung', 'Kategorie', 'Datum', 'Kosten CHF',
+                'Kilometerstand', 'Shop', 'Teile-Nr', 'Notizen'];
+
+  const fzName = id => {
+    const f = db.fahrzeuge.find(x => x.id === id);
+    return f ? f.name : '';
+  };
+  const esc = v => {
+    const s = (v === null || v === undefined) ? '' : String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+
+  const rows = list.map(e => [
+    fzName(e.fz), e.name, e.kat, e.datum,
+    e.kosten || 0, e.km || 0, e.shop || '', e.oem || '', e.notiz || '',
+  ].map(esc).join(','));
+
+  return [cols.join(','), ...rows].join('\r\n');
+}
+
 // ---- Seed-Daten (Demo) ----
 /**
  * Befüllt die DB mit Beispieldaten wenn leer.
