@@ -119,6 +119,16 @@
         <label>Notizen</label>
         <textarea id="f-notiz" placeholder="Einbauhinweise, Eindrücke, nächste Schritte..."></textarea>
       </div>
+      <div class="field">
+        <label>Fotos</label>
+        <div class="photo-edit-strip" id="photo-edit-strip"></div>
+        <input type="file" id="f-photo-input" accept="image/*" multiple hidden
+               onchange="onPhotoPick(event)">
+        <button type="button" class="btn btn-ghost btn-full"
+                onclick="document.getElementById('f-photo-input').click()">
+          <i class="ti ti-camera-plus"></i> Foto hinzufügen
+        </button>
+      </div>
       <button class="btn btn-primary btn-full" onclick="saveEntry()">
         <i class="ti ti-check"></i> Speichern
       </button>
@@ -170,6 +180,11 @@
     </div>
     <div class="modal-body" id="detail-body"></div>
   </div>
+</div>
+
+<!-- FULLSCREEN PHOTO VIEWER (in-flow overlay, kein position:fixed) -->
+<div class="photo-viewer" id="photo-viewer" onclick="closePhotoViewer()">
+  <img id="photo-viewer-img" src="" alt="">
 </div>
 
 <script src="db.js"></script>

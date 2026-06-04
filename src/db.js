@@ -80,9 +80,12 @@ function dbUpdateFahrzeug(id, data) {
  * @param {string} id
  */
 function dbDeleteFahrzeug(id) {
+  const removedIds = db.eintraege.filter(e => e.fz === id).map(e => e.id);
   db.fahrzeuge = db.fahrzeuge.filter(f => f.id !== id);
   db.eintraege = db.eintraege.filter(e => e.fz !== id);
   dbSave(db);
+  // Fotos der gelöschten Einträge aufräumen (fire & forget).
+  removedIds.forEach(eid => dbDeletePhotosForEntry(eid).catch(() => {}));
 }
 
 // ---- Mod-Einträge ----
@@ -133,6 +136,8 @@ function dbUpdateEintrag(id, data) {
 function dbDeleteEintrag(id) {
   db.eintraege = db.eintraege.filter(e => e.id !== id);
   dbSave(db);
+  // Zugehörige Fotos aus IndexedDB aufräumen (fire & forget).
+  dbDeletePhotosForEntry(id).catch(() => {});
 }
 
 // ---- Statistik-Helpers ----
@@ -188,6 +193,142 @@ function dbExportCsv(fzId) {
   ].map(esc).join(','));
 
   return [cols.join(','), ...rows].join('\r\n');
+}
+
+// ---- IndexedDB: Foto-Anhänge ----
+//
+// Fotos sind zu gross für localStorage und leben deshalb in einer eigenen
+// IndexedDB-Datenbank. Object-Store `photos`, keyPath `id`, Index `entryId`
+// für die Zuordnung zum Mod-Eintrag. Foto-Record:
+//   { id, entryId, data: <dataURL>, w, h, created }
+
+const PHOTO_DB         = 'modlog_photos';
+const PHOTO_DB_VERSION = 1;
+const PHOTO_STORE      = 'photos';
+let _photoDbPromise    = null;
+
+/**
+ * Öffnet (und erzeugt bei Bedarf) die Foto-IndexedDB. Gecacht.
+ * @returns {Promise<IDBDatabase>}
+ */
+function dbOpenPhotos() {
+  if (_photoDbPromise) return _photoDbPromise;
+  _photoDbPromise = new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB nicht verfügbar'));
+      return;
+    }
+    const req = indexedDB.open(PHOTO_DB, PHOTO_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const idb = req.result;
+      if (!idb.objectStoreNames.contains(PHOTO_STORE)) {
+        const store = idb.createObjectStore(PHOTO_STORE, { keyPath: 'id' });
+        store.createIndex('entryId', 'entryId', { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+  return _photoDbPromise;
+}
+
+/**
+ * Speichert ein Foto für einen Eintrag.
+ * @param {string} entryId
+ * @param {string} dataUrl  Bereits clientseitig skalierter dataURL.
+ * @param {number} [w]
+ * @param {number} [h]
+ * @returns {Promise<object>} Der gespeicherte Foto-Record.
+ */
+function dbAddPhoto(entryId, dataUrl, w, h) {
+  return dbOpenPhotos().then(idb => new Promise((resolve, reject) => {
+    const tx    = idb.transaction(PHOTO_STORE, 'readwrite');
+    const store = tx.objectStore(PHOTO_STORE);
+    const rec   = { id: dbNewId('p'), entryId, data: dataUrl, w: w || 0, h: h || 0, created: Date.now() };
+    const r = store.add(rec);
+    r.onsuccess = () => resolve(rec);
+    r.onerror   = () => reject(r.error);
+  }));
+}
+
+/**
+ * Alle Fotos eines Eintrags (nach Erstellzeit sortiert).
+ * @param {string} entryId
+ * @returns {Promise<object[]>}
+ */
+function dbGetPhotos(entryId) {
+  return dbOpenPhotos().then(idb => new Promise((resolve, reject) => {
+    const store = idb.transaction(PHOTO_STORE, 'readonly').objectStore(PHOTO_STORE);
+    const r = store.index('entryId').getAll(entryId);
+    r.onsuccess = () => resolve((r.result || []).sort((a, b) => a.created - b.created));
+    r.onerror   = () => reject(r.error);
+  }));
+}
+
+/**
+ * @param {string} photoId
+ * @returns {Promise<void>}
+ */
+function dbDeletePhoto(photoId) {
+  return dbOpenPhotos().then(idb => new Promise((resolve, reject) => {
+    const store = idb.transaction(PHOTO_STORE, 'readwrite').objectStore(PHOTO_STORE);
+    const r = store.delete(photoId);
+    r.onsuccess = () => resolve();
+    r.onerror   = () => reject(r.error);
+  }));
+}
+
+/**
+ * Löscht alle Fotos eines Eintrags.
+ * @param {string} entryId
+ * @returns {Promise<void>}
+ */
+function dbDeletePhotosForEntry(entryId) {
+  return dbGetPhotos(entryId)
+    .then(photos => Promise.all(photos.map(p => dbDeletePhoto(p.id))))
+    .then(() => undefined);
+}
+
+/**
+ * Alle Foto-Records (für Backup).
+ * @returns {Promise<object[]>}
+ */
+function dbGetAllPhotos() {
+  return dbOpenPhotos().then(idb => new Promise((resolve, reject) => {
+    const store = idb.transaction(PHOTO_STORE, 'readonly').objectStore(PHOTO_STORE);
+    const r = store.getAll();
+    r.onsuccess = () => resolve(r.result || []);
+    r.onerror   = () => reject(r.error);
+  }));
+}
+
+/**
+ * Anzahl Fotos je Eintrag (für Badge auf den Log-Karten).
+ * @returns {Promise<Record<string, number>>}
+ */
+function dbGetPhotoCounts() {
+  return dbGetAllPhotos().then(all => {
+    const counts = {};
+    all.forEach(p => { counts[p.entryId] = (counts[p.entryId] || 0) + 1; });
+    return counts;
+  });
+}
+
+/**
+ * Ersetzt den gesamten Foto-Store (für Restore).
+ * @param {object[]} records
+ * @returns {Promise<void>}
+ */
+function dbReplaceAllPhotos(records) {
+  return dbOpenPhotos().then(idb => new Promise((resolve, reject) => {
+    const tx    = idb.transaction(PHOTO_STORE, 'readwrite');
+    const store = tx.objectStore(PHOTO_STORE);
+    store.clear();
+    (records || []).forEach(rec => { if (rec && rec.id) store.put(rec); });
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+    tx.onabort    = () => reject(tx.error);
+  }));
 }
 
 // ---- Seed-Daten (Demo) ----

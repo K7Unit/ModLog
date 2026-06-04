@@ -33,6 +33,14 @@ let searchTerm = '';
 let editingId = null;
 let currentTab = 'log';
 
+// Foto-State des Add/Edit-Modals.
+// modalPhotos: [{ key, persistedId|null, data, w, h }]
+//   persistedId gesetzt = bereits in IndexedDB; null = neu, noch nicht gespeichert.
+// modalRemovedIds: persistierte Foto-IDs, die beim Speichern gelöscht werden.
+let modalPhotos = [];
+let modalRemovedIds = [];
+let detailPhotos = [];   // Fotos des aktuell offenen Detail-Modals (für Viewer).
+
 // ---- Helpers ----
 
 function katBadge(k) {
@@ -83,7 +91,7 @@ function renderLog() {
 
 // Rendert nur die Eintragsliste neu (z.B. bei Live-Suche), ohne die
 // Filter-Reihen anzufassen, damit der Fokus im Suchfeld erhalten bleibt.
-function renderLogList() {
+async function renderLogList() {
   const list = document.getElementById('log-list');
   const entries = dbGetEintraege({ fz: activeFz, kat: activeKat, q: searchTerm });
 
@@ -102,7 +110,13 @@ function renderLogList() {
     return;
   }
 
-  list.innerHTML = entries.map(e => `
+  // Foto-Anzahl je Eintrag (für Badge). Fehlt IndexedDB → leeres Mapping.
+  let counts = {};
+  try { counts = await dbGetPhotoCounts(); } catch (_) { counts = {}; }
+
+  list.innerHTML = entries.map(e => {
+    const pc = counts[e.id] || 0;
+    return `
     <div class="card" onclick="showDetail('${e.id}')">
       <div class="card-header">
         <div>
@@ -111,13 +125,14 @@ function renderLogList() {
           <div class="card-sub">
             ${getFzKuerzel(e.fz)} · ${formatDate(e.datum)}
             ${e.km ? ' · ' + e.km.toLocaleString('de-CH') + ' km' : ''}
+            ${pc ? ` · <span class="photo-badge"><i class="ti ti-camera"></i>${pc}</span>` : ''}
           </div>
         </div>
         <div class="cost-chip">CHF ${fmtChf(e.kosten)}</div>
       </div>
       ${e.notiz ? `<div class="card-desc">${e.notiz}</div>` : ''}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderVehicleFilter() {
@@ -283,7 +298,7 @@ function renderFahrzeuge() {
 
 // ---- DETAIL ----
 
-function showDetail(id) {
+async function showDetail(id) {
   const e  = dbGetEintraege().find(x => x.id === id);
   if (!e) return;
   const fz = getFz(e.fz);
@@ -327,6 +342,7 @@ function showDetail(id) {
                 border-radius:var(--r);font-size:12px;color:var(--text2);line-height:1.6">
       ${e.notiz}
     </div>` : ''}
+    <div class="photo-strip" id="detail-photo-strip"></div>
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn btn-ghost btn-sm" onclick="editEntry('${e.id}')">
         <i class="ti ti-edit"></i> Bearbeiten
@@ -338,6 +354,33 @@ function showDetail(id) {
   `;
 
   openModal('modal-detail');
+
+  // Fotos nachladen (async) und in den Strip rendern.
+  detailPhotos = [];
+  try { detailPhotos = await dbGetPhotos(id); } catch (_) { detailPhotos = []; }
+  const strip = document.getElementById('detail-photo-strip');
+  if (strip && detailPhotos.length) {
+    strip.innerHTML = detailPhotos.map((p, i) =>
+      `<img class="photo-strip-img" src="${p.data}" alt="Foto ${i + 1}"
+            onclick="openPhotoViewer(${i})">`
+    ).join('');
+  }
+}
+
+// ---- FOTO-VIEWER (Fullscreen) ----
+
+function openPhotoViewer(index) {
+  const p = detailPhotos[index];
+  if (!p) return;
+  document.getElementById('photo-viewer-img').src = p.data;
+  document.getElementById('photo-viewer').classList.add('open');
+  // In-flow Overlay sitzt am Dokumentanfang → nach oben scrollen.
+  window.scrollTo(0, 0);
+}
+
+function closePhotoViewer() {
+  document.getElementById('photo-viewer').classList.remove('open');
+  document.getElementById('photo-viewer-img').src = '';
 }
 
 // ---- ADD / EDIT ----
@@ -353,11 +396,14 @@ function openAddModal() {
   document.getElementById('f-shop').value   = '';
   document.getElementById('f-oem').value    = '';
   document.getElementById('f-notiz').value  = '';
+  modalPhotos = [];
+  modalRemovedIds = [];
+  renderPhotoEditStrip();
   populateFzSelect(null);
   openModal('modal-add');
 }
 
-function editEntry(id) {
+async function editEntry(id) {
   const e = dbGetEintraege().find(x => x.id === id);
   if (!e) return;
   editingId = id;
@@ -372,7 +418,19 @@ function editEntry(id) {
   document.getElementById('f-shop').value   = e.shop   || '';
   document.getElementById('f-oem').value    = e.oem    || '';
   document.getElementById('f-notiz').value  = e.notiz  || '';
+
+  // Bestehende Fotos laden.
+  modalRemovedIds = [];
+  modalPhotos = [];
+  renderPhotoEditStrip();
   openModal('modal-add');
+  try {
+    const photos = await dbGetPhotos(id);
+    modalPhotos = photos.map(p => ({
+      key: p.id, persistedId: p.id, data: p.data, w: p.w, h: p.h,
+    }));
+    renderPhotoEditStrip();
+  } catch (_) { /* IndexedDB nicht verfügbar – ohne Fotos weiter */ }
 }
 
 function populateFzSelect(selectedId) {
@@ -384,7 +442,74 @@ function populateFzSelect(selectedId) {
   ).join('');
 }
 
-function saveEntry() {
+// ---- FOTO-PICKER (Modal) ----
+
+// Liest eine Bilddatei, skaliert sie via Canvas auf max. 1600px (längste
+// Kante) und gibt einen komprimierten JPEG-dataURL zurück.
+function processImageFile(file) {
+  const MAX = 1600;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
+      img.onload = () => {
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (w > MAX || h > MAX) {
+          if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+          else        { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve({ data: canvas.toDataURL('image/jpeg', 0.82), w, h });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onPhotoPick(event) {
+  const files = Array.from(event.target.files || []);
+  event.target.value = '';  // erlaubt erneute Auswahl derselben Datei
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    try {
+      const { data, w, h } = await processImageFile(file);
+      modalPhotos.push({ key: dbNewId('tmp'), persistedId: null, data, w, h });
+      renderPhotoEditStrip();
+    } catch (err) {
+      console.warn('[ModLog] Foto konnte nicht verarbeitet werden:', err);
+    }
+  }
+}
+
+function renderPhotoEditStrip() {
+  const strip = document.getElementById('photo-edit-strip');
+  if (!strip) return;
+  strip.innerHTML = modalPhotos.map(p => `
+    <div class="photo-thumb">
+      <img src="${p.data}" alt="">
+      <button type="button" class="photo-thumb-x" onclick="removePhotoFromModal('${p.key}')">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>`).join('');
+}
+
+function removePhotoFromModal(key) {
+  const idx = modalPhotos.findIndex(p => p.key === key);
+  if (idx < 0) return;
+  const p = modalPhotos[idx];
+  if (p.persistedId) modalRemovedIds.push(p.persistedId);
+  modalPhotos.splice(idx, 1);
+  renderPhotoEditStrip();
+}
+
+async function saveEntry() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { document.getElementById('f-name').focus(); return; }
 
@@ -400,12 +525,25 @@ function saveEntry() {
     notiz:  document.getElementById('f-notiz').value.trim(),
   };
 
+  let entryId = editingId;
   if (editingId) {
     dbUpdateEintrag(editingId, data);
   } else {
-    dbAddEintrag(data);
+    entryId = dbAddEintrag(data).id;
   }
 
+  // Foto-Änderungen persistieren: entfernte löschen, neue hinzufügen.
+  try {
+    await Promise.all(modalRemovedIds.map(pid => dbDeletePhoto(pid)));
+    for (const p of modalPhotos) {
+      if (!p.persistedId) await dbAddPhoto(entryId, p.data, p.w, p.h);
+    }
+  } catch (err) {
+    console.warn('[ModLog] Fotos speichern fehlgeschlagen:', err);
+  }
+
+  modalPhotos = [];
+  modalRemovedIds = [];
   closeModal('modal-add');
   renderLog();
 }

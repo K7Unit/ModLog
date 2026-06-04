@@ -8,7 +8,7 @@
  * Event alte Caches aufräumt.
  */
 
-const CACHE = 'modlog-v1';
+const CACHE = 'modlog-v2';
 
 const ASSETS = [
   './',
