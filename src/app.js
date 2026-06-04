@@ -465,5 +465,15 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   });
 });
 
+// ---- Service Worker (PWA / Offline) ----
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err =>
+      console.warn('[ModLog] SW-Registrierung fehlgeschlagen:', err)
+    );
+  });
+}
+
 // ---- Init ----
 renderLog();
