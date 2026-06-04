@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ModLog</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">MOD<span>_</span>LOG <span>v1.0</span></div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost btn-sm" onclick="showTab('stats')"><i class="ti ti-chart-bar"></i></button>
+    <button class="btn btn-primary btn-sm" onclick="openAddModal()"><i class="ti ti-plus"></i> Neu</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('log')" id="tab-log">EINTRÄGE</div>
+  <div class="tab" onclick="showTab('stats')" id="tab-stats">STATISTIK</div>
+  <div class="tab" onclick="showTab('fahrzeuge')" id="tab-fahrzeuge">FAHRZEUGE</div>
+</div>
+
+<!-- TAB: LOG -->
+<div class="content" id="view-log">
+  <div class="vehicle-row" id="vehicle-filter-row"></div>
+  <div class="filter-bar" id="kat-filter-row"></div>
+  <div id="log-list"></div>
+</div>
+
+<!-- TAB: STATS -->
+<div class="content" id="view-stats" style="display:none">
+  <div class="stats-grid" id="stats-grid"></div>
+  <div class="card" id="kat-breakdown"></div>
+</div>
+
+<!-- TAB: FAHRZEUGE -->
+<div class="content" id="view-fahrzeuge" style="display:none">
+  <div id="fz-list"></div>
+  <button class="btn btn-ghost btn-full" style="margin-top:4px" onclick="openAddFzModal()">
+    <i class="ti ti-plus"></i> Fahrzeug hinzufügen
+  </button>
+</div>
+
+<button class="fab" onclick="openAddModal()" id="fab-btn"><i class="ti ti-plus"></i></button>
+
+<!-- MODAL: ADD/EDIT MOD -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title-text">// NEUER EINTRAG</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Fahrzeug</label>
+        <select id="f-fz"></select>
+      </div>
+      <div class="field">
+        <label>Bezeichnung</label>
+        <input type="text" id="f-name" placeholder="z.B. Wagner EVO1 LLK">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Kategorie</label>
+          <select id="f-kat">
+            <option>Motor</option>
+            <option>Fahrwerk</option>
+            <option>Antrieb</option>
+            <option>Exterieur</option>
+            <option>Elektronik</option>
+            <option>Sonstiges</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Datum</label>
+          <input type="date" id="f-datum">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Kosten (CHF)</label>
+          <input type="number" id="f-kosten" placeholder="0" min="0">
+        </div>
+        <div class="field">
+          <label>Kilometerstand</label>
+          <input type="number" id="f-km" placeholder="z.B. 87500">
+        </div>
+      </div>
+      <div class="field">
+        <label>Lieferant / Shop</label>
+        <input type="text" id="f-shop" placeholder="z.B. racingmods.ch">
+      </div>
+      <div class="field">
+        <label>Teile-Nr / OEM</label>
+        <input type="text" id="f-oem" placeholder="optional">
+      </div>
+      <div class="field">
+        <label>Notizen</label>
+        <textarea id="f-notiz" placeholder="Einbauhinweise, Eindrücke, nächste Schritte..."></textarea>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveEntry()">
+        <i class="ti ti-check"></i> Speichern
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD FAHRZEUG -->
+<div class="modal-overlay" id="modal-fz">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">// FAHRZEUG</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-fz')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Bezeichnung</label>
+        <input type="text" id="fz-name" placeholder="z.B. BMW 135i E82">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Baujahr</label>
+          <input type="number" id="fz-jahr" placeholder="2010">
+        </div>
+        <div class="field">
+          <label>Farbe</label>
+          <input type="text" id="fz-farbe" placeholder="Space Grey">
+        </div>
+      </div>
+      <div class="field">
+        <label>Kürzel (2–4 Zeichen)</label>
+        <input type="text" id="fz-kuerzel" placeholder="135i" maxlength="4">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveFahrzeug()">
+        <i class="ti ti-check"></i> Speichern
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DETAIL -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">// DETAIL</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-detail')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
