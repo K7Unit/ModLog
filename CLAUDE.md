@@ -68,26 +68,31 @@ npx live-server src/
 python3 -m http.server 8080 --directory src/
 ```
 
-## Geplante Features / Backlog
+## Status — v1.0.0 (Baseline)
 
-Priorisiert nach Nützlichkeit:
+Erster Entwicklungszyklus gemerged (PR #1, squash-merge in `main`). Alles
+unter „Gebaut" ist umgesetzt, getestet (30 Tests) und ausgeliefert.
 
-### High Priority
-- [ ] **Foto-Anhänge** — FileReader → base64 → IndexedDB (localStorage zu klein für Bilder)
-- [ ] **Suche** — Volltextsuche über name/shop/oem/notiz
-- [ ] **CSV-Export** — Alle Einträge als CSV runterladen
+### Gebaut (v1)
+- [x] **Kern-CRUD** — 3 Tabs (EINTRÄGE/STATISTIK/FAHRZEUGE), Einträge + Fahrzeuge anlegen/bearbeiten/löschen (Bottom-Sheet-Modals)
+- [x] **Filter** — Fahrzeug + Kategorie + Jahr (kombinierbar)
+- [x] **Suche** — Live-Volltextsuche über name/shop/oem/notiz
+- [x] **CSV-Export** — UTF-8 mit BOM, auf aktiven Fahrzeugfilter beschränkt
+- [x] **Statistik** — Gesamtkosten, Kosten pro Fahrzeug (Balken), Kategorie-Aufschlüsselung
+- [x] **Foto-Anhänge** — IndexedDB (`modlog_photos`), Canvas-Resize 1600px/JPEG 0.82, Mehrfach-Pick, Thumbnails, Detail-Strip, Fullscreen-Viewer, Anzahl-Badge
+- [x] **Backup/Restore** — Voll-JSON inkl. Fotos (`version`-Feld), validierter Import mit Überschreib-Bestätigung
+- [x] **Web Share** — `navigator.share` (inkl. Datei, wo unterstützt), Clipboard-Fallback + Toast
+- [x] **Dark/Light-Toggle** — `[data-theme="light"]` auf `<html>`, persistiert in `modlog_theme_v1`, kein FOUC; Default dark, `prefers-color-scheme: light` nur als Erst-Fallback
+- [x] **QR-Code** — Teilen UND Importieren (voller Round-Trip). Encoder `src/qr.js`, Decoder `src/qr-decode.js` (beide selbstständig, MIT, keine Laufzeit-Dep). Import: Kamera-Scan (getUserMedia, in-flow Overlay) + Paste-Fallback → Vorschau → `dbImportVehicle` (frische ids; 'neu'/'zusammenfuehren'). Payload ohne Fotos, sanfte Kürzung
+- [x] **PWA** — `manifest.json` + `sw.js` (Cache `modlog-v5`), Icons 180/192/512
+- [x] **Tests/CI** — vm-isolierte Harness, 30 Tests; GitHub Actions (`npm ci` → `node --check` → JSON-Validierung → `npm test`)
 
-### Medium Priority
-- [ ] **PWA / Service Worker** — Offline-Nutzung auf dem iPhone
-- [ ] **Web Share API** — Einzelne Einträge teilen (WhatsApp etc.)
-- [ ] **Suchfeld** — Live-Filter in der Log-Ansicht
-- [ ] **Jahresfilter** — Nach Jahr filtern in der Log-Ansicht
+## Backlog (offen)
 
-### Low Priority / Nice to have
-- [x] **Dark/Light-Mode-Toggle** — `[data-theme="light"]` auf `<html>`, Umschalter in der Topbar, persistiert in `modlog_theme_v1` (eigener Key, getrennt von App-Daten). Default dark; `prefers-color-scheme: light` nur als Erst-Fallback.
-- [x] **QR-Code** — Fahrzeug-Setup (Meta + Mods, OHNE Fotos) als QR teilen UND importieren (voller Round-Trip). Encoder in `src/qr.js`, Decoder in `src/qr-decode.js` (beide selbstständig, MIT, keine Laufzeit-Abhängigkeit). Import: Kamera-Scan (getUserMedia, in-flow Overlay) mit Paste-Fallback → Vorschau → `dbImportVehicle` (frische ids; 'neu' oder 'zusammenfuehren'). Zu grosse Listen werden beim Teilen gekürzt (truncated).
-- [ ] **IndexedDB Migration** — Für grössere Datensätze
-- [ ] **Backup/Restore** — JSON-Export + Import
+- [ ] **QR-Decoder: Perspektive/Keystone** — robustes Mehr-Alignment-Sampling für schräge Scans (aktuell auf frontale/saubere Codes getrimmt)
+- [ ] **QR-Scan: automatisierte Kamera-Tests** — der Live-`getUserMedia`-Pfad ist bisher nur manueller On-Device-Check
+- [ ] **Web Share: Datei-Edge-Cases** — Verhalten bei sehr grossen Foto-Dateien / Teil-Support von `canShare({ files })` verfeinern
+- [ ] **IndexedDB-Migration** — Versionierung/Migration für grössere Datensätze
 
 ## Dos & Don'ts
 
