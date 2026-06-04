@@ -123,6 +123,27 @@ test('dbExportBackup → dbImportBackup full round-trip incl. photos', async () 
   assert.deepEqual(photos, expPhotos, 'Fotos verlustfrei wiederhergestellt');
 });
 
+test('dbGetJahre returns distinct, descending years; jahr filter combines', () => {
+  const db = loadDb();
+  const base = { fz: 'fz1', kat: 'Motor', kosten: 1, km: 0, shop: '', oem: '', notiz: '' };
+  db.dbAddEintrag({ ...base, name: 'A', datum: '2024-05-01' });
+  db.dbAddEintrag({ ...base, name: 'B', datum: '2022-03-01' });
+  db.dbAddEintrag({ ...base, name: 'C', datum: '2024-11-01' });
+
+  const jahre = db.dbGetJahre();
+  assert.ok(jahre.includes('2024') && jahre.includes('2022'));
+  assert.equal(jahre.filter(y => y === '2024').length, 1, 'distinct');
+  assert.deepEqual(jahre, jahre.slice().sort((a, b) => b.localeCompare(a)), 'absteigend');
+
+  const only2024 = db.dbGetEintraege({ jahr: '2024' });
+  assert.ok(only2024.every(e => e.datum.slice(0, 4) === '2024'));
+
+  // kombiniert mit Volltextsuche
+  const combo = db.dbGetEintraege({ jahr: '2024', q: 'A' });
+  assert.equal(combo.length, 1);
+  assert.equal(combo[0].name, 'A');
+});
+
 test('dbValidateBackup rejects malformed payloads', async () => {
   const db = loadDb();
   assert.equal(db.dbValidateBackup(null), false);

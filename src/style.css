@@ -260,6 +260,36 @@ body {
 }
 .search-bar input::placeholder { color: var(--text3); }
 
+/* ---- YEAR FILTER ---- */
+.year-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.year-row label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.year-select {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 0 12px;
+  min-height: 44px;
+  outline: none;
+  -webkit-appearance: none;
+  transition: border-color .15s;
+}
+.year-select:focus { border-color: var(--accent); }
+.year-select option { background: var(--bg2); }
+
 /* ---- VEHICLE SELECTOR ---- */
 .vehicle-row {
   display: flex;

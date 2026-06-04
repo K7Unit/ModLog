@@ -91,13 +91,16 @@ function dbDeleteFahrzeug(id) {
 // ---- Mod-Einträge ----
 
 /**
- * @param {{ fz?: string, kat?: string, q?: string }} filter
+ * @param {{ fz?: string, kat?: string, q?: string, jahr?: string }} filter
  * @returns {ModEintrag[]}
  */
 function dbGetEintraege(filter = {}) {
   let list = db.eintraege.slice();
   if (filter.fz && filter.fz !== 'all') list = list.filter(e => e.fz === filter.fz);
   if (filter.kat && filter.kat !== 'all') list = list.filter(e => e.kat === filter.kat);
+  if (filter.jahr && filter.jahr !== 'all') {
+    list = list.filter(e => (e.datum || '').slice(0, 4) === filter.jahr);
+  }
   if (filter.q) {
     const q = filter.q.trim().toLowerCase();
     if (q) {
@@ -138,6 +141,19 @@ function dbDeleteEintrag(id) {
   dbSave(db);
   // Zugehörige Fotos aus IndexedDB aufräumen (fire & forget).
   dbDeletePhotosForEntry(id).catch(() => {});
+}
+
+/**
+ * Distinkte Jahre aus den Einträgen (absteigend sortiert) — für den
+ * Jahresfilter in der Log-Ansicht.
+ * @returns {string[]} z.B. ['2026', '2025', '2024']
+ */
+function dbGetJahre() {
+  const set = new Set();
+  db.eintraege.forEach(e => {
+    if (e.datum && e.datum.length >= 4) set.add(e.datum.slice(0, 4));
+  });
+  return Array.from(set).sort((a, b) => b.localeCompare(a));
 }
 
 // ---- Statistik-Helpers ----

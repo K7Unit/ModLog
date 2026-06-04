@@ -29,6 +29,7 @@ const KAT_BADGE_CLASS = {
 
 let activeFz  = 'all';
 let activeKat = 'all';
+let activeJahr = 'all';
 let searchTerm = '';
 let editingId = null;
 let currentTab = 'log';
@@ -86,6 +87,7 @@ function showTab(t) {
 function renderLog() {
   renderVehicleFilter();
   renderKatFilter();
+  renderYearFilter();
   renderLogList();
 }
 
@@ -93,7 +95,7 @@ function renderLog() {
 // Filter-Reihen anzufassen, damit der Fokus im Suchfeld erhalten bleibt.
 async function renderLogList() {
   const list = document.getElementById('log-list');
-  const entries = dbGetEintraege({ fz: activeFz, kat: activeKat, q: searchTerm });
+  const entries = dbGetEintraege({ fz: activeFz, kat: activeKat, q: searchTerm, jahr: activeJahr });
 
   if (!entries.length) {
     list.innerHTML = searchTerm.trim()
@@ -160,6 +162,23 @@ function renderKatFilter() {
 
 function setFzFilter(id)  { activeFz  = id; clearSearch(); renderLog(); }
 function setKatFilter(k)  { activeKat = k;  clearSearch(); renderLog(); }
+
+// Jahr ist mit allen anderen Filtern UND der Suche kombinierbar, daher
+// wird die Suche beim Jahreswechsel NICHT zurückgesetzt. Das gewählte Jahr
+// bleibt zudem beim Wechsel von Fahrzeug/Kategorie erhalten.
+function setJahrFilter(j) { activeJahr = j; renderLogList(); }
+
+function renderYearFilter() {
+  const sel = document.getElementById('year-select');
+  if (!sel) return;
+  const jahre = dbGetJahre();
+  // Gewähltes Jahr zurücksetzen, falls es nicht mehr existiert (z.B. nach Import).
+  if (activeJahr !== 'all' && !jahre.includes(activeJahr)) activeJahr = 'all';
+  sel.innerHTML = ['<option value="all">Alle Jahre</option>']
+    .concat(jahre.map(j => `<option value="${j}">${j}</option>`))
+    .join('');
+  sel.value = activeJahr;
+}
 
 // ---- SEARCH ----
 
