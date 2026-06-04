@@ -486,6 +486,146 @@ function dbBuildQrPayload(fzId, opts = {}) {
   return make([], true);
 }
 
+// ---- QR-Import (Gegenstück zu dbBuildQrPayload) ----
+
+// Typisierter Fehler mit .code für differenzierte UI-Meldungen.
+function _qrError(code, message) {
+  const e = new Error(message);
+  e.code = code;
+  return e;
+}
+
+const _IMPORT_KATS = ['Motor', 'Fahrwerk', 'Antrieb', 'Exterieur', 'Elektronik', 'Sonstiges'];
+
+/**
+ * Parst und validiert ein QR-/JSON-Payload (Format von dbBuildQrPayload) und
+ * normalisiert es zu { fahrzeug, eintraege, truncated }. Wirft bei Problemen
+ * einen typisierten Fehler (.code: invalid_json | not_modlog |
+ * unsupported_version | invalid_structure).
+ * @param {string} str
+ * @returns {{ fahrzeug: object, eintraege: object[], truncated: boolean }}
+ */
+function dbParseQrPayload(str) {
+  let obj;
+  try {
+    obj = JSON.parse(str);
+  } catch (_) {
+    throw _qrError('invalid_json', 'Kein gültiges JSON.');
+  }
+  if (!obj || typeof obj !== 'object' || obj.app !== 'ModLog' || obj.t !== 'vehicle') {
+    throw _qrError('not_modlog', 'Kein ModLog-Fahrzeug-Code.');
+  }
+  if (obj.v !== 1) {
+    throw _qrError('unsupported_version', 'Nicht unterstützte Version: ' + obj.v);
+  }
+  const fz = obj.fz;
+  if (!fz || typeof fz !== 'object' || typeof fz.name !== 'string' || !fz.name.trim()) {
+    throw _qrError('invalid_structure', 'Fahrzeugdaten fehlen oder sind ungültig.');
+  }
+  if (!Array.isArray(obj.mods)) {
+    throw _qrError('invalid_structure', 'Eintragsliste fehlt.');
+  }
+
+  const fahrzeug = {
+    name: String(fz.name).trim(),
+    jahr: Number.isFinite(fz.jahr) ? fz.jahr : (parseInt(fz.jahr, 10) || new Date().getFullYear()),
+    farbe: typeof fz.farbe === 'string' ? fz.farbe : '',
+    kuerzel: typeof fz.kuerzel === 'string' ? fz.kuerzel : '',
+  };
+  const eintraege = obj.mods.map(m => ({
+    name: typeof m.n === 'string' ? m.n.trim() : '',
+    kat: _IMPORT_KATS.includes(m.k) ? m.k : 'Sonstiges',
+    datum: typeof m.d === 'string' ? m.d : '',
+    kosten: Number(m.ko) || 0,
+    km: Number(m.km) || 0,
+    shop: typeof m.s === 'string' ? m.s : '',
+    oem: typeof m.o === 'string' ? m.o : '',
+    notiz: typeof m.no === 'string' ? m.no : '',
+  })).filter(e => e.name); // Einträge ohne Bezeichnung verwerfen
+
+  return { fahrzeug, eintraege, truncated: !!obj.truncated };
+}
+
+/**
+ * Sucht ein bestehendes Fahrzeug mit identischem name+kuerzel (case-insensitiv)
+ * — Kandidat fürs Zusammenführen. Gibt null zurück, wenn keins existiert.
+ * @param {{name?:string, kuerzel?:string}} fahrzeug
+ * @returns {Fahrzeug|null}
+ */
+function dbFindImportMatch(fahrzeug) {
+  if (!fahrzeug) return null;
+  const name = (fahrzeug.name || '').trim().toLowerCase();
+  const kuerzel = (fahrzeug.kuerzel || '').trim().toLowerCase();
+  return db.fahrzeuge.find(f =>
+    (f.name || '').trim().toLowerCase() === name &&
+    (f.kuerzel || '').trim().toLowerCase() === kuerzel
+  ) || null;
+}
+
+// Eindeutige id garantieren (auch bei Batch-Import im selben Millisekunden-Tick).
+function _freshId(prefix, used) {
+  let id;
+  do { id = dbNewId(prefix); } while (used.has(id));
+  used.add(id);
+  return id;
+}
+
+/**
+ * Importiert ein Fahrzeug + Einträge aus geparsten Daten. IMMER mit frischen
+ * ids — bestehende Datensätze werden nie überschrieben.
+ *   mode 'neu'             → neues Fahrzeug anlegen (Default)
+ *   mode 'zusammenfuehren' → Einträge an bestehendes (name+kuerzel) anhängen;
+ *                            wirft 'no_merge_target', wenn keins existiert.
+ * @param {{fahrzeug:object, eintraege:object[]}} data
+ * @param {('neu'|'zusammenfuehren')} [mode]
+ * @returns {{ fahrzeugId: string, count: number, mode: string }}
+ */
+function dbImportVehicle(data, mode = 'neu') {
+  if (!data || !data.fahrzeug) throw _qrError('invalid_structure', 'Keine Importdaten.');
+  const eintraege = Array.isArray(data.eintraege) ? data.eintraege : [];
+
+  const used = new Set([
+    ...db.fahrzeuge.map(f => f.id),
+    ...db.eintraege.map(e => e.id),
+  ]);
+
+  let targetId;
+  if (mode === 'zusammenfuehren') {
+    const match = dbFindImportMatch(data.fahrzeug);
+    if (!match) throw _qrError('no_merge_target', 'Kein passendes Fahrzeug zum Zusammenführen.');
+    targetId = match.id;
+  } else {
+    const fz = {
+      id: _freshId('fz', used),
+      name: data.fahrzeug.name,
+      jahr: data.fahrzeug.jahr,
+      farbe: data.fahrzeug.farbe || '',
+      kuerzel: data.fahrzeug.kuerzel || '',
+    };
+    db.fahrzeuge.push(fz);
+    targetId = fz.id;
+  }
+
+  let count = 0;
+  for (const e of eintraege) {
+    db.eintraege.push({
+      id: _freshId('e', used),
+      fz: targetId,
+      name: e.name,
+      kat: e.kat,
+      datum: e.datum,
+      kosten: e.kosten || 0,
+      km: e.km || 0,
+      shop: e.shop || '',
+      oem: e.oem || '',
+      notiz: e.notiz || '',
+    });
+    count++;
+  }
+  dbSave(db);
+  return { fahrzeugId: targetId, count, mode: mode === 'zusammenfuehren' ? 'zusammenfuehren' : 'neu' };
+}
+
 // ---- Seed-Daten (Demo) ----
 /**
  * Befüllt die DB mit Beispieldaten wenn leer.
