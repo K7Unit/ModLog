@@ -45,7 +45,10 @@ src/
 // KatEnum: 'Motor' | 'Fahrwerk' | 'Antrieb' | 'Exterieur' | 'Elektronik' | 'Sonstiges'
 ```
 
-Storage-Key: `modlog_data_v1` (nie umbenennen ohne Migration!)
+Storage-Keys (nie umbenennen ohne Migration!):
+- `modlog_data_v1` — App-Daten (Fahrzeuge + Einträge) in localStorage
+- `modlog_theme_v1` — gewähltes Theme ('light'/'dark') in localStorage
+- IndexedDB `modlog_photos` — Foto-Blobs (Store-Key `id`, Index `entryId`)
 
 ## Entwickeln
 
@@ -75,7 +78,7 @@ Priorisiert nach Nützlichkeit:
 - [ ] **Jahresfilter** — Nach Jahr filtern in der Log-Ansicht
 
 ### Low Priority / Nice to have
-- [ ] **Dark/Light-Mode-Toggle** — Aktuell nur Dark
+- [x] **Dark/Light-Mode-Toggle** — `[data-theme="light"]` auf `<html>`, Umschalter in der Topbar, persistiert in `modlog_theme_v1` (eigener Key, getrennt von App-Daten). Default dark; `prefers-color-scheme: light` nur als Erst-Fallback.
 - [ ] **QR-Code** — Fahrzeug-Setup als QR teilen
 - [ ] **IndexedDB Migration** — Für grössere Datensätze
 - [ ] **Backup/Restore** — JSON-Export + Import

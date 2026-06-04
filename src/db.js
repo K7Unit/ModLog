@@ -10,6 +10,7 @@
  */
 
 const STORAGE_KEY = 'modlog_data_v1';
+const THEME_KEY   = 'modlog_theme_v1';
 
 /**
  * Rohdaten aus localStorage laden.
@@ -36,6 +37,50 @@ function dbSave(data) {
     console.error('[ModLog] Save error:', e);
     alert('Speichern fehlgeschlagen – localStorage voll?');
   }
+}
+
+// ---- Theme ----
+// Eigener localStorage-Key, völlig getrennt von den App-Daten (modlog_data_v1).
+
+/**
+ * Gespeichertes Theme lesen.
+ * @returns {('light'|'dark'|null)} null wenn nichts gespeichert.
+ */
+function dbGetTheme() {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    return (t === 'light' || t === 'dark') ? t : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Theme persistieren.
+ * @param {('light'|'dark')} theme
+ */
+function dbSetTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch (e) {
+    console.error('[ModLog] Theme save error:', e);
+  }
+}
+
+/**
+ * Effektives Theme bestimmen: gespeichertes zuerst, sonst Default dark —
+ * prefers-color-scheme: light gilt nur als Erst-Fallback, wenn nichts
+ * gespeichert ist.
+ * @returns {('light'|'dark')}
+ */
+function dbResolveTheme() {
+  const saved = dbGetTheme();
+  if (saved) return saved;
+  if (typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    return 'light';
+  }
+  return 'dark';
 }
 
 /**
@@ -448,3 +493,10 @@ function dbSeedIfEmpty() {
 // ---- Init ----
 let db = dbLoad();
 dbSeedIfEmpty();
+
+// Theme so früh wie möglich auf <html> setzen (db.js wird im <head> geladen),
+// damit beim Start kein Flash des falschen Themes entsteht. Im Node-Test-
+// Harness fehlt document.documentElement → übersprungen.
+if (typeof document !== 'undefined' && document.documentElement) {
+  document.documentElement.setAttribute('data-theme', dbResolveTheme());
+}

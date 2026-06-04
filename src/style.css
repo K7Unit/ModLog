@@ -35,6 +35,31 @@
   --r2:          10px;
 }
 
+/* ---- LIGHT THEME ----
+   Gleicher flacher, industrieller Look — nur Flächen/Rahmen/Text invertieren.
+   Kein reines Weiss (#fff), keine Verläufe/Schatten. Amber-Accent bleibt
+   Markenkonstante über beide Themes. */
+[data-theme="light"] {
+  --bg:          #e7e4df;
+  --bg2:         #f1efea;
+  --bg3:         #e2dfd8;
+  --bg4:         #d6d2ca;
+  --border:      #cfcbc2;
+  --border2:     #b6b1a7;
+  --text:        #1c1b18;
+  --text2:       #6a665e;
+  --text3:       #938e86;
+  --accent:      #e8a020;
+  --accent2:     #b87a10;
+  --accent-dim:  #f7ecd4;
+  --red:         #c33028;
+  --red-dim:     #f6dedb;
+  --green:       #2e7d4f;
+  --green-dim:   #dceee2;
+  --blue:        #2f63a8;
+  --blue-dim:    #dde6f4;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -42,6 +67,7 @@ body {
   font-size: 14px;
   min-height: 100vh;
   overflow-x: hidden;
+  transition: background-color .15s, color .15s;
 }
 
 /* ---- TOPBAR ---- */
@@ -173,6 +199,14 @@ body {
 .badge-elektronik { background: #180828; color: #c060e8; border: 1px solid #301050; }
 .badge-sonstiges  { background: #1a1a1a; color: #888;    border: 1px solid #333;    }
 
+/* Light-Theme: helle, getönte Badges mit dunklem Text (gleicher flacher Look) */
+[data-theme="light"] .badge-motor      { background: #fbe4dc; color: #b4451f; border-color: #f0c4b4; }
+[data-theme="light"] .badge-fahrwerk   { background: #dde8f6; color: #2f5fa8; border-color: #c2d4ec; }
+[data-theme="light"] .badge-antrieb    { background: #dcefe1; color: #2e7d4f; border-color: #c0e0c9; }
+[data-theme="light"] .badge-exterieur  { background: #f1ecc9; color: #847414; border-color: #e1d89c; }
+[data-theme="light"] .badge-elektronik { background: #efe0f6; color: #7a3fa8; border-color: #ddc4ec; }
+[data-theme="light"] .badge-sonstiges  { background: #e6e3dd; color: #6a665e; border-color: #cfcbc2; }
+
 /* ---- COST CHIP ---- */
 .cost-chip {
   font-family: var(--font-mono);
@@ -185,6 +219,7 @@ body {
   white-space: nowrap;
   flex-shrink: 0;
 }
+[data-theme="light"] .cost-chip { color: var(--accent2); border-color: #e3cfa0; }
 
 /* ---- STATS ---- */
 .stats-grid {

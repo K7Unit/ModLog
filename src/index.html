@@ -14,12 +14,15 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
+<!-- db.js im head: wendet das gespeicherte Theme vor dem ersten Paint an (kein FOUC) -->
+<script src="db.js"></script>
 </head>
 <body>
 
 <div class="topbar">
   <div class="topbar-logo">MOD<span>_</span>LOG <span>v1.0</span></div>
   <div class="topbar-actions">
+    <button class="btn btn-ghost btn-sm" id="theme-toggle" onclick="toggleTheme()" aria-label="Thema wechseln"><i class="ti ti-sun"></i></button>
     <button class="btn btn-ghost btn-sm" onclick="showTab('stats')"><i class="ti ti-chart-bar"></i></button>
     <button class="btn btn-primary btn-sm" onclick="openAddModal()"><i class="ti ti-plus"></i> Neu</button>
   </div>
@@ -205,7 +208,6 @@
 <!-- TOAST (Kurzmeldung, z.B. Clipboard-Fallback beim Teilen) -->
 <div class="toast" id="toast"></div>
 
-<script src="db.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

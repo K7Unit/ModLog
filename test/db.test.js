@@ -144,6 +144,30 @@ test('dbGetJahre returns distinct, descending years; jahr filter combines', () =
   assert.equal(combo[0].name, 'A');
 });
 
+test('dbGetTheme/dbSetTheme persist via separate key, untouched app data', () => {
+  const db = loadDb();
+  assert.equal(db.dbGetTheme(), null, 'nichts gespeichert → null');
+
+  const before = db.localStorage.getItem('modlog_data_v1'); // Seed-Daten
+
+  db.dbSetTheme('light');
+  assert.equal(db.dbGetTheme(), 'light');
+  assert.equal(db.localStorage.getItem('modlog_theme_v1'), 'light', 'eigener Key');
+
+  db.dbSetTheme('dark');
+  assert.equal(db.dbGetTheme(), 'dark');
+
+  assert.equal(db.localStorage.getItem('modlog_data_v1'), before, 'App-Daten unangetastet');
+});
+
+test('dbResolveTheme defaults to dark when nothing stored', () => {
+  const db = loadDb();
+  // Kein window.matchMedia im Harness → Default dark
+  assert.equal(db.dbResolveTheme(), 'dark');
+  db.dbSetTheme('light');
+  assert.equal(db.dbResolveTheme(), 'light', 'gespeichertes Theme gewinnt');
+});
+
 test('dbValidateBackup rejects malformed payloads', async () => {
   const db = loadDb();
   assert.equal(db.dbValidateBackup(null), false);

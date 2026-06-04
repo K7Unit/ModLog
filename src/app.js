@@ -68,6 +68,36 @@ function getFzKuerzel(id) {
   return fz ? fz.kuerzel : '?';
 }
 
+// ---- Theme (Dark/Light) ----
+
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+
+// Spiegelt das aktive Theme in Toggle-Icon und theme-color-Meta.
+function updateThemeUi(theme) {
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = theme === 'light' ? 'ti ti-moon' : 'ti ti-sun';
+    btn.setAttribute('aria-label', theme === 'light' ? 'Dunkles Thema' : 'Helles Thema');
+  }
+  // theme-color an die Oberfläche anpassen (Manifest bleibt amber, Branding).
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'light' ? '#e7e4df' : '#0f0f0f');
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  updateThemeUi(theme);
+}
+
+function toggleTheme() {
+  const next = currentTheme() === 'light' ? 'dark' : 'light';
+  dbSetTheme(next);     // persistiert in modlog_theme_v1
+  applyTheme(next);     // sofort, ohne Reload
+}
+
 // ---- Tabs ----
 
 function showTab(t) {
@@ -770,4 +800,6 @@ if ('serviceWorker' in navigator) {
 }
 
 // ---- Init ----
+// Theme-UI mit dem bereits (in db.js) gesetzten <html data-theme> synchronisieren.
+if (document.documentElement) updateThemeUi(currentTheme());
 renderLog();
