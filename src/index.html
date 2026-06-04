@@ -208,6 +208,24 @@
 <!-- TOAST (Kurzmeldung, z.B. Clipboard-Fallback beim Teilen) -->
 <div class="toast" id="toast"></div>
 
+<!-- QR-VIEWER (in-flow overlay, kein position:fixed) -->
+<div class="qr-viewer" id="qr-viewer" onclick="if(event.target===this)closeQrViewer()">
+  <div class="qr-panel">
+    <div class="qr-title" id="qr-title">// QR TEILEN</div>
+    <div class="qr-canvas-wrap"><canvas id="qr-canvas"></canvas></div>
+    <div class="qr-note" id="qr-note">Fotos werden nicht geteilt.</div>
+    <div class="qr-actions">
+      <button class="btn btn-ghost btn-sm" onclick="copyQrPayload()">
+        <i class="ti ti-copy"></i> Kopieren
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="closeQrViewer()">
+        <i class="ti ti-x"></i> Schliessen
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="qr.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -12,17 +12,22 @@ Stack: Vanilla HTML/CSS/JS, kein Framework, kein Build-Step. Alles in `src/`.
 ```
 src/
   index.html   — Markup, Modals, Tab-Struktur
-  style.css    — Alle Styles (CSS-Variablen, dark theme)
-  db.js        — Daten-Layer (localStorage). Muss VOR app.js geladen werden.
+  style.css    — Alle Styles (CSS-Variablen, dark + [data-theme="light"])
+  db.js        — Daten-Layer (localStorage + IndexedDB). Wird im <head> geladen
+                 (setzt Theme vor dem ersten Paint, kein FOUC).
+  qr.js        — Vendored QR-Encoder (selbstständig, MIT, keine Laufzeit-Dep).
   app.js       — UI-Logik (Rendering, Events, Modals)
+test/          — Node-Tests (node:test + fake-indexeddb; QR via qrcode/jsqr, devDeps)
 ```
 
 ## Architektur-Regeln
 
-- `db.js` ist der einzige Ort wo `localStorage` angefasst wird. Nie direkt in `app.js`.
+- `db.js` ist der einzige Ort wo `localStorage`/IndexedDB angefasst wird. Nie direkt in `app.js`.
 - `app.js` ruft nur `db*`-Funktionen auf (z.B. `dbAddEintrag`, `dbGetFahrzeuge`).
 - Neue Features → neue `db*`-Funktion in `db.js` + UI in `app.js`.
-- Keine externen Libraries ohne guten Grund. Bestehende CDN-Links: Google Fonts, Tabler Icons.
+- Keine externen **Laufzeit**-Libraries. CDN-Links: nur Google Fonts + Tabler Icons.
+  Der QR-Encoder ist lokal in `src/qr.js` vendored (kein CDN/npm zur Laufzeit).
+  Test-Deps (fake-indexeddb, qrcode, jsqr) bleiben devDependencies und werden nie ausgeliefert.
 
 ## Design-System
 
@@ -79,7 +84,7 @@ Priorisiert nach Nützlichkeit:
 
 ### Low Priority / Nice to have
 - [x] **Dark/Light-Mode-Toggle** — `[data-theme="light"]` auf `<html>`, Umschalter in der Topbar, persistiert in `modlog_theme_v1` (eigener Key, getrennt von App-Daten). Default dark; `prefers-color-scheme: light` nur als Erst-Fallback.
-- [ ] **QR-Code** — Fahrzeug-Setup als QR teilen
+- [x] **QR-Code** — Fahrzeug-Setup (Meta + Mods, OHNE Fotos) als QR teilen. Encoder lokal vendored in `src/qr.js` (selbstständig, MIT, keine Laufzeit-Abhängigkeit). Zu grosse Listen werden gekürzt (truncated). Nur Teilen/Anzeigen — Scan-/Import-Flow ist Zukunftsarbeit.
 - [ ] **IndexedDB Migration** — Für grössere Datensätze
 - [ ] **Backup/Restore** — JSON-Export + Import
 

@@ -5,9 +5,11 @@
   "description": "iPhone-optimierte Web-App zur Dokumentation von Fahrzeug-Umbauten.",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node --check src/db.js && node --check src/app.js && node --check src/sw.js"
+    "check": "node --check src/db.js && node --check src/qr.js && node --check src/app.js && node --check src/sw.js"
   },
   "devDependencies": {
-    "fake-indexeddb": "^6.2.5"
+    "fake-indexeddb": "^6.2.5",
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4"
   }
 }

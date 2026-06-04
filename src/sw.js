@@ -8,13 +8,14 @@
  * Event alte Caches aufräumt.
  */
 
-const CACHE = 'modlog-v3';
+const CACHE = 'modlog-v4';
 
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './db.js',
+  './qr.js',
   './app.js',
   './manifest.json',
   './icons/icon-180.png',

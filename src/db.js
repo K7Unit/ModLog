@@ -435,6 +435,57 @@ function dbImportBackup(obj) {
   return dbReplaceAllPhotos(obj.photos || []);
 }
 
+// ---- QR-Share-Payload ----
+
+// UTF-8-Bytelänge ohne Abhängigkeit (für QR-Kapazitätsabschätzung).
+function _utf8Len(str) {
+  let n = 0;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    if (c < 0x80) n += 1;
+    else if (c < 0x800) n += 2;
+    else if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; }
+    else n += 3;
+  }
+  return n;
+}
+
+/**
+ * Baut ein kompaktes, teilbares Payload-Objekt für ein Fahrzeug (Meta + Mods).
+ * Fotos werden bewusst NIE eingebettet (Scanbarkeit). Wird das JSON grösser
+ * als maxBytes, werden Einträge (neueste zuerst) weggelassen und truncated=true
+ * gesetzt — im Extremfall bleibt nur die Fahrzeug-Meta.
+ * @param {string} fzId
+ * @param {{maxBytes?:number}} [opts]
+ * @returns {object|null} null wenn das Fahrzeug nicht existiert.
+ */
+function dbBuildQrPayload(fzId, opts = {}) {
+  const maxBytes = opts.maxBytes || 1000;
+  const fz = db.fahrzeuge.find(f => f.id === fzId);
+  if (!fz) return null;
+
+  const meta = { name: fz.name, jahr: fz.jahr, farbe: fz.farbe, kuerzel: fz.kuerzel };
+  const allMods = db.eintraege
+    .filter(e => e.fz === fzId)
+    .sort((a, b) => (b.datum || '').localeCompare(a.datum || ''))
+    .map(e => ({
+      n: e.name, k: e.kat, d: e.datum,
+      ko: e.kosten || 0, km: e.km || 0,
+      s: e.shop || '', o: e.oem || '', no: e.notiz || '',
+    }));
+
+  const make = (mods, truncated) => ({ app: 'ModLog', v: 1, t: 'vehicle', fz: meta, mods, truncated });
+
+  let payload = make(allMods, false);
+  if (_utf8Len(JSON.stringify(payload)) <= maxBytes) return payload;
+
+  for (let count = allMods.length - 1; count >= 0; count--) {
+    payload = make(allMods.slice(0, count), true);
+    if (_utf8Len(JSON.stringify(payload)) <= maxBytes) return payload;
+  }
+  return make([], true);
+}
+
 // ---- Seed-Daten (Demo) ----
 /**
  * Befüllt die DB mit Beispieldaten wenn leer.

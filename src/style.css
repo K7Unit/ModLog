@@ -645,3 +645,53 @@ body {
   object-fit: contain;
   border-radius: var(--r);
 }
+
+/* ---- QR-VIEWER (in-flow overlay, kein position:fixed) ---- */
+.qr-viewer {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 400;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.qr-viewer.open { display: flex; }
+.qr-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 20px;
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
+}
+.qr-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 14px;
+  word-break: break-word;
+}
+/* QR muss schwarz auf weiss bleiben (Scanbarkeit) — eigener heller Rahmen */
+.qr-canvas-wrap {
+  background: #fff;
+  border-radius: var(--r);
+  padding: 12px;
+  display: inline-block;
+  line-height: 0;
+}
+.qr-canvas-wrap canvas { display: block; image-rendering: pixelated; }
+.qr-note {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text2);
+  margin: 14px 0;
+  line-height: 1.5;
+}
+.qr-actions { display: flex; gap: 8px; justify-content: center; }

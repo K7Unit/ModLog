@@ -381,6 +381,10 @@ function renderFahrzeuge() {
       </div>
       <div class="card-meta"><i class="ti ti-tool"></i>${count} Mods</div>
       <div class="card-actions">
+        <button class="btn btn-ghost btn-sm"
+                onclick="event.stopPropagation(); showQrForVehicle('${f.id}')">
+          <i class="ti ti-qrcode"></i> QR teilen
+        </button>
         <button class="btn btn-danger btn-sm"
                 onclick="event.stopPropagation(); deleteFahrzeug('${f.id}')">
           <i class="ti ti-trash"></i> Löschen
@@ -567,6 +571,74 @@ function showToast(msg) {
   t.classList.add('show');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---- QR-SHARE ----
+
+let qrPayloadJson = '';   // rohes JSON des zuletzt angezeigten QR (für Kopieren)
+
+function showQrForVehicle(fzId) {
+  const payload = dbBuildQrPayload(fzId, { maxBytes: 1000 });
+  if (!payload) return;
+  qrPayloadJson = JSON.stringify(payload);
+
+  let qr;
+  try {
+    qr = QR.generate(qrPayloadJson, { ecl: 'L' });
+  } catch (err) {
+    showToast('QR konnte nicht erzeugt werden');
+    return;
+  }
+
+  // Auf Canvas zeichnen — QR immer schwarz auf weiss mit heller Ruhezone,
+  // damit Scanner es in beiden Themes lesen können.
+  const quiet = 4;
+  const canvas = document.getElementById('qr-canvas');
+  const cssSize = 264;                                   // Anzeigegrösse in px
+  const dpr = window.devicePixelRatio || 1;
+  const modulesPerSide = qr.size + quiet * 2;
+  const scale = Math.max(1, Math.floor((cssSize * dpr) / modulesPerSide));
+  const px = modulesPerSide * scale;
+  canvas.width = px;
+  canvas.height = px;
+  canvas.style.width = cssSize + 'px';
+  canvas.style.height = cssSize + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, px, px);
+  ctx.fillStyle = '#000000';
+  for (let r = 0; r < qr.size; r++) {
+    for (let c = 0; c < qr.size; c++) {
+      if (qr.modules[r][c]) {
+        ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+      }
+    }
+  }
+
+  const fz = getFz(fzId);
+  document.getElementById('qr-title').textContent = `// ${fz ? fz.name : 'QR'}`;
+  const note = document.getElementById('qr-note');
+  note.textContent = payload.truncated
+    ? 'Fotos werden nicht geteilt. Liste gekürzt — QR eignet sich für kleinere Setups.'
+    : 'Fotos werden nicht geteilt.';
+
+  openQrViewer();
+}
+
+function openQrViewer() {
+  document.getElementById('qr-viewer').classList.add('open');
+  window.scrollTo(0, 0);
+}
+
+function closeQrViewer() {
+  document.getElementById('qr-viewer').classList.remove('open');
+}
+
+async function copyQrPayload() {
+  if (!qrPayloadJson) return;
+  await copyToClipboard(qrPayloadJson);
+  showToast('JSON in die Zwischenablage kopiert');
 }
 
 // ---- ADD / EDIT ----
