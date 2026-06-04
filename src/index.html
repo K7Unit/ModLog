@@ -74,9 +74,14 @@
 <!-- TAB: FAHRZEUGE -->
 <div class="content" id="view-fahrzeuge" style="display:none">
   <div id="fz-list"></div>
-  <button class="btn btn-ghost btn-full" style="margin-top:4px" onclick="openAddFzModal()">
-    <i class="ti ti-plus"></i> Fahrzeug hinzufügen
-  </button>
+  <div class="field-row" style="margin-top:4px">
+    <button class="btn btn-ghost btn-full" onclick="openAddFzModal()">
+      <i class="ti ti-plus"></i> Fahrzeug
+    </button>
+    <button class="btn btn-ghost btn-full" onclick="openImport()">
+      <i class="ti ti-download"></i> Importieren
+    </button>
+  </div>
 </div>
 
 <button class="fab" onclick="openAddModal()" id="fab-btn"><i class="ti ti-plus"></i></button>
@@ -207,6 +212,17 @@
 
 <!-- TOAST (Kurzmeldung, z.B. Clipboard-Fallback beim Teilen) -->
 <div class="toast" id="toast"></div>
+
+<!-- IMPORT-VIEWER (in-flow overlay, kein position:fixed) -->
+<div class="import-viewer" id="import-viewer" onclick="if(event.target===this)closeImport()">
+  <div class="import-panel">
+    <div class="import-head">
+      <span class="import-title" id="import-title">// IMPORTIEREN</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeImport()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="import-body"></div>
+  </div>
+</div>
 
 <!-- QR-VIEWER (in-flow overlay, kein position:fixed) -->
 <div class="qr-viewer" id="qr-viewer" onclick="if(event.target===this)closeQrViewer()">

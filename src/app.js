@@ -641,6 +641,124 @@ async function copyQrPayload() {
   showToast('JSON in die Zwischenablage kopiert');
 }
 
+// ---- QR-IMPORT (Scan/Paste → Vorschau → Bestätigen) ----
+
+let importParsed = null;   // { fahrzeug, eintraege, truncated } der aktuellen Vorschau
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function importErrorMsg(err) {
+  const map = {
+    invalid_json: 'Ungültiges JSON.',
+    not_modlog: 'Kein ModLog-Fahrzeug-Code.',
+    unsupported_version: 'Nicht unterstützte Version.',
+    invalid_structure: 'Unvollständige oder ungültige Daten.',
+    no_merge_target: 'Kein passendes Fahrzeug zum Zusammenführen.',
+  };
+  return (err && map[err.code]) || 'Import fehlgeschlagen.';
+}
+
+function openImport() {
+  importParsed = null;
+  renderImportPaste();
+  document.getElementById('import-viewer').classList.add('open');
+  window.scrollTo(0, 0);
+}
+
+function closeImport() {
+  document.getElementById('import-viewer').classList.remove('open');
+}
+
+function renderImportPaste() {
+  document.getElementById('import-title').textContent = '// SETUP IMPORTIEREN';
+  document.getElementById('import-body').innerHTML = `
+    <div class="field">
+      <label>JSON einfügen</label>
+      <textarea id="import-json" placeholder="Vom Teilen-Dialog kopiertes JSON hier einfügen…"></textarea>
+    </div>
+    <div class="import-hint">Tipp: Beim Teilen „Kopieren" tippen und den Text hier einfügen.</div>
+    <button class="btn btn-primary btn-full" onclick="previewImportFromPaste()">
+      <i class="ti ti-eye"></i> Vorschau
+    </button>`;
+}
+
+function previewImportFromPaste() {
+  const el = document.getElementById('import-json');
+  const raw = (el.value || '').trim();
+  if (!raw) { el.focus(); return; }
+  let parsed;
+  try {
+    parsed = dbParseQrPayload(raw);
+  } catch (err) {
+    showToast(importErrorMsg(err));
+    return;
+  }
+  importParsed = parsed;
+  renderImportPreview();
+}
+
+// Gemeinsame Vorschau für Scan & Paste.
+function renderImportPreview() {
+  const p = importParsed;
+  if (!p) return;
+  const total = p.eintraege.reduce((s, e) => s + (e.kosten || 0), 0);
+  const match = dbFindImportMatch(p.fahrzeug);
+
+  document.getElementById('import-title').textContent = '// VORSCHAU';
+  document.getElementById('import-body').innerHTML = `
+    <div class="card" style="cursor:default">
+      <div class="card-title">${escapeHtml(p.fahrzeug.name)}</div>
+      <div class="card-sub">${[p.fahrzeug.jahr, p.fahrzeug.farbe, p.fahrzeug.kuerzel]
+        .filter(Boolean).map(escapeHtml).join(' · ')}</div>
+      <div class="detail-line">
+        <span class="detail-key">Einträge</span>
+        <span class="detail-val">${p.eintraege.length}</span>
+      </div>
+      <div class="detail-line">
+        <span class="detail-key">Gesamtkosten</span>
+        <span class="detail-val" style="font-family:var(--font-mono);color:var(--accent)">CHF ${fmtChf(total)}</span>
+      </div>
+    </div>
+    <div class="import-note">
+      <i class="ti ti-photo-off"></i> Fotos sind in QR-Shares nicht enthalten.${p.truncated ? ' Die geteilte Liste war gekürzt.' : ''}
+    </div>
+    ${match ? `
+    <div class="field">
+      <label>Import-Modus</label>
+      <select id="import-mode">
+        <option value="neu">Neues Fahrzeug anlegen</option>
+        <option value="zusammenfuehren">Zu „${escapeHtml(match.name)}" hinzufügen</option>
+      </select>
+    </div>` : ''}
+    <div class="field-row" style="margin-top:6px">
+      <button class="btn btn-primary btn-full" onclick="confirmImport()">
+        <i class="ti ti-check"></i> Importieren
+      </button>
+      <button class="btn btn-ghost btn-full" onclick="closeImport()">Abbrechen</button>
+    </div>`;
+}
+
+function confirmImport() {
+  const p = importParsed;
+  if (!p) return;
+  const modeEl = document.getElementById('import-mode');
+  const mode = modeEl ? modeEl.value : 'neu';
+  let res;
+  try {
+    res = dbImportVehicle(p, mode);
+  } catch (err) {
+    showToast(importErrorMsg(err));
+    return;
+  }
+  closeImport();
+  if (activeFz === res.fahrzeugId || mode === 'neu') activeFz = 'all';
+  renderFahrzeuge();
+  showToast(`Fahrzeug importiert: ${res.count} Mods`);
+}
+
 // ---- ADD / EDIT ----
 
 function openAddModal() {
