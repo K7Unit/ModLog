@@ -29,6 +29,7 @@ const KAT_BADGE_CLASS = {
 
 let activeFz  = 'all';
 let activeKat = 'all';
+let searchTerm = '';
 let editingId = null;
 let currentTab = 'log';
 
@@ -77,12 +78,23 @@ function showTab(t) {
 function renderLog() {
   renderVehicleFilter();
   renderKatFilter();
+  renderLogList();
+}
 
+// Rendert nur die Eintragsliste neu (z.B. bei Live-Suche), ohne die
+// Filter-Reihen anzufassen, damit der Fokus im Suchfeld erhalten bleibt.
+function renderLogList() {
   const list = document.getElementById('log-list');
-  const entries = dbGetEintraege({ fz: activeFz, kat: activeKat });
+  const entries = dbGetEintraege({ fz: activeFz, kat: activeKat, q: searchTerm });
 
   if (!entries.length) {
-    list.innerHTML = `
+    list.innerHTML = searchTerm.trim()
+      ? `
+      <div class="empty">
+        <i class="ti ti-search-off"></i>
+        Keine Treffer für „${searchTerm.trim()}".
+      </div>`
+      : `
       <div class="empty">
         <i class="ti ti-tool"></i>
         Noch keine Einträge.<br>Tippe + um loszulegen.
@@ -131,8 +143,22 @@ function renderKatFilter() {
   }).join('');
 }
 
-function setFzFilter(id)  { activeFz  = id; renderLog(); }
-function setKatFilter(k)  { activeKat = k;  renderLog(); }
+function setFzFilter(id)  { activeFz  = id; clearSearch(); renderLog(); }
+function setKatFilter(k)  { activeKat = k;  clearSearch(); renderLog(); }
+
+// ---- SEARCH ----
+
+function setSearch(v) {
+  searchTerm = v;
+  renderLogList();
+}
+
+// Setzt das Suchfeld zurück (beim Wechsel von Fahrzeug- oder Kategorie-Filter).
+function clearSearch() {
+  searchTerm = '';
+  const el = document.getElementById('search-input');
+  if (el) el.value = '';
+}
 
 // ---- STATS ----
 

@@ -26,6 +26,12 @@
 
 <!-- TAB: LOG -->
 <div class="content" id="view-log">
+  <div class="search-bar">
+    <i class="ti ti-search"></i>
+    <input type="text" id="search-input" placeholder="Suche: Name, Shop, Teile-Nr, Notiz…"
+           autocomplete="off" autocorrect="off" autocapitalize="off"
+           oninput="setSearch(this.value)">
+  </div>
   <div class="vehicle-row" id="vehicle-filter-row"></div>
   <div class="filter-bar" id="kat-filter-row"></div>
   <div id="log-list"></div>

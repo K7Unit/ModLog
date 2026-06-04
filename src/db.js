@@ -88,13 +88,21 @@ function dbDeleteFahrzeug(id) {
 // ---- Mod-Einträge ----
 
 /**
- * @param {{ fz?: string, kat?: string }} filter
+ * @param {{ fz?: string, kat?: string, q?: string }} filter
  * @returns {ModEintrag[]}
  */
 function dbGetEintraege(filter = {}) {
   let list = db.eintraege.slice();
   if (filter.fz && filter.fz !== 'all') list = list.filter(e => e.fz === filter.fz);
   if (filter.kat && filter.kat !== 'all') list = list.filter(e => e.kat === filter.kat);
+  if (filter.q) {
+    const q = filter.q.trim().toLowerCase();
+    if (q) {
+      list = list.filter(e =>
+        [e.name, e.shop, e.oem, e.notiz].some(v => (v || '').toLowerCase().includes(q))
+      );
+    }
+  }
   return list.sort((a, b) => b.datum.localeCompare(a.datum));
 }
 
