@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dev dependencies
+        run: npm ci
+
+      - name: Syntax-check all JS in src/
+        run: |
+          for f in src/*.js; do
+            echo "node --check $f"
+            node --check "$f"
+          done
+
+      - name: Validate JSON files
+        run: |
+          for f in $(find src package.json -name '*.json' 2>/dev/null); do
+            echo "validate $f"
+            node -e "JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8'))" "$f"
+          done
+
+      - name: Run tests
+        run: npm test

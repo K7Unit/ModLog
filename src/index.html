@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ModLog</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e8a020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ModLog">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<!-- db.js im head: wendet das gespeicherte Theme vor dem ersten Paint an (kein FOUC) -->
+<script src="db.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">MOD<span>_</span>LOG <span>v1.0</span></div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost btn-sm" id="theme-toggle" onclick="toggleTheme()" aria-label="Thema wechseln"><i class="ti ti-sun"></i></button>
+    <button class="btn btn-ghost btn-sm" onclick="showTab('stats')"><i class="ti ti-chart-bar"></i></button>
+    <button class="btn btn-primary btn-sm" onclick="openAddModal()"><i class="ti ti-plus"></i> Neu</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('log')" id="tab-log">EINTRÄGE</div>
+  <div class="tab" onclick="showTab('stats')" id="tab-stats">STATISTIK</div>
+  <div class="tab" onclick="showTab('fahrzeuge')" id="tab-fahrzeuge">FAHRZEUGE</div>
+</div>
+
+<!-- TAB: LOG -->
+<div class="content" id="view-log">
+  <div class="search-bar">
+    <i class="ti ti-search"></i>
+    <input type="text" id="search-input" placeholder="Suche: Name, Shop, Teile-Nr, Notiz…"
+           autocomplete="off" autocorrect="off" autocapitalize="off"
+           oninput="setSearch(this.value)">
+  </div>
+  <div class="vehicle-row" id="vehicle-filter-row"></div>
+  <div class="filter-bar" id="kat-filter-row"></div>
+  <div class="year-row">
+    <label for="year-select">Jahr</label>
+    <select class="year-select" id="year-select" onchange="setJahrFilter(this.value)"></select>
+  </div>
+  <div id="log-list"></div>
+</div>
+
+<!-- TAB: STATS -->
+<div class="content" id="view-stats" style="display:none">
+  <div class="stats-grid" id="stats-grid"></div>
+  <div class="card" id="kat-breakdown"></div>
+  <button class="btn btn-ghost btn-full" style="margin-top:4px" onclick="exportCsv()">
+    <i class="ti ti-download"></i> <span id="export-label">CSV exportieren</span>
+  </button>
+  <div class="section-h" style="margin-top:20px">Datensicherung</div>
+  <div class="field-row">
+    <button class="btn btn-ghost btn-full" onclick="exportBackup()">
+      <i class="ti ti-archive"></i> Backup
+    </button>
+    <button class="btn btn-ghost btn-full" onclick="triggerImport()">
+      <i class="ti ti-upload"></i> Wiederherstellen
+    </button>
+  </div>
+  <input type="file" id="restore-input" accept="application/json" hidden
+         onchange="importBackup(event)">
+</div>
+
+<!-- TAB: FAHRZEUGE -->
+<div class="content" id="view-fahrzeuge" style="display:none">
+  <div id="fz-list"></div>
+  <div class="field-row" style="margin-top:4px">
+    <button class="btn btn-ghost btn-full" onclick="openAddFzModal()">
+      <i class="ti ti-plus"></i> Fahrzeug
+    </button>
+    <button class="btn btn-ghost btn-full" onclick="openImportScan()">
+      <i class="ti ti-qrcode"></i> QR scannen
+    </button>
+  </div>
+</div>
+
+<button class="fab" onclick="openAddModal()" id="fab-btn"><i class="ti ti-plus"></i></button>
+
+<!-- MODAL: ADD/EDIT MOD -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title-text">// NEUER EINTRAG</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Fahrzeug</label>
+        <select id="f-fz"></select>
+      </div>
+      <div class="field">
+        <label>Bezeichnung</label>
+        <input type="text" id="f-name" placeholder="z.B. Wagner EVO1 LLK">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Kategorie</label>
+          <select id="f-kat">
+            <option>Motor</option>
+            <option>Fahrwerk</option>
+            <option>Antrieb</option>
+            <option>Exterieur</option>
+            <option>Elektronik</option>
+            <option>Sonstiges</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Datum</label>
+          <input type="date" id="f-datum">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Kosten (CHF)</label>
+          <input type="number" id="f-kosten" placeholder="0" min="0">
+        </div>
+        <div class="field">
+          <label>Kilometerstand</label>
+          <input type="number" id="f-km" placeholder="z.B. 87500">
+        </div>
+      </div>
+      <div class="field">
+        <label>Lieferant / Shop</label>
+        <input type="text" id="f-shop" placeholder="z.B. racingmods.ch">
+      </div>
+      <div class="field">
+        <label>Teile-Nr / OEM</label>
+        <input type="text" id="f-oem" placeholder="optional">
+      </div>
+      <div class="field">
+        <label>Notizen</label>
+        <textarea id="f-notiz" placeholder="Einbauhinweise, Eindrücke, nächste Schritte..."></textarea>
+      </div>
+      <div class="field">
+        <label>Fotos</label>
+        <div class="photo-edit-strip" id="photo-edit-strip"></div>
+        <input type="file" id="f-photo-input" accept="image/*" multiple hidden
+               onchange="onPhotoPick(event)">
+        <button type="button" class="btn btn-ghost btn-full"
+                onclick="document.getElementById('f-photo-input').click()">
+          <i class="ti ti-camera-plus"></i> Foto hinzufügen
+        </button>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveEntry()">
+        <i class="ti ti-check"></i> Speichern
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD FAHRZEUG -->
+<div class="modal-overlay" id="modal-fz">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">// FAHRZEUG</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-fz')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Bezeichnung</label>
+        <input type="text" id="fz-name" placeholder="z.B. BMW 135i E82">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Baujahr</label>
+          <input type="number" id="fz-jahr" placeholder="2010">
+        </div>
+        <div class="field">
+          <label>Farbe</label>
+          <input type="text" id="fz-farbe" placeholder="Space Grey">
+        </div>
+      </div>
+      <div class="field">
+        <label>Kürzel (2–4 Zeichen)</label>
+        <input type="text" id="fz-kuerzel" placeholder="135i" maxlength="4">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveFahrzeug()">
+        <i class="ti ti-check"></i> Speichern
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DETAIL -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">// DETAIL</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-detail')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<!-- FULLSCREEN PHOTO VIEWER (in-flow overlay, kein position:fixed) -->
+<div class="photo-viewer" id="photo-viewer" onclick="closePhotoViewer()">
+  <img id="photo-viewer-img" src="" alt="">
+</div>
+
+<!-- TOAST (Kurzmeldung, z.B. Clipboard-Fallback beim Teilen) -->
+<div class="toast" id="toast"></div>
+
+<!-- IMPORT-VIEWER (in-flow overlay, kein position:fixed) -->
+<div class="import-viewer" id="import-viewer" onclick="if(event.target===this)closeImport()">
+  <div class="import-panel">
+    <div class="import-head">
+      <span class="import-title" id="import-title">// IMPORTIEREN</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeImport()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="import-body"></div>
+  </div>
+</div>
+
+<!-- QR-VIEWER (in-flow overlay, kein position:fixed) -->
+<div class="qr-viewer" id="qr-viewer" onclick="if(event.target===this)closeQrViewer()">
+  <div class="qr-panel">
+    <div class="qr-title" id="qr-title">// QR TEILEN</div>
+    <div class="qr-canvas-wrap"><canvas id="qr-canvas"></canvas></div>
+    <div class="qr-note" id="qr-note">Fotos werden nicht geteilt.</div>
+    <div class="qr-actions">
+      <button class="btn btn-ghost btn-sm" onclick="copyQrPayload()">
+        <i class="ti ti-copy"></i> Kopieren
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="closeQrViewer()">
+        <i class="ti ti-x"></i> Schliessen
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="qr.js"></script>
+<script src="qr-decode.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
