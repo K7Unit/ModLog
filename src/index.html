@@ -51,6 +51,17 @@
   <button class="btn btn-ghost btn-full" style="margin-top:4px" onclick="exportCsv()">
     <i class="ti ti-download"></i> <span id="export-label">CSV exportieren</span>
   </button>
+  <div class="section-h" style="margin-top:20px">Datensicherung</div>
+  <div class="field-row">
+    <button class="btn btn-ghost btn-full" onclick="exportBackup()">
+      <i class="ti ti-archive"></i> Backup
+    </button>
+    <button class="btn btn-ghost btn-full" onclick="triggerImport()">
+      <i class="ti ti-upload"></i> Wiederherstellen
+    </button>
+  </div>
+  <input type="file" id="restore-input" accept="application/json" hidden
+         onchange="importBackup(event)">
 </div>
 
 <!-- TAB: FAHRZEUGE -->

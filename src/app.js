@@ -262,6 +262,51 @@ function exportCsv() {
   document.body.removeChild(a);
 }
 
+// ---- BACKUP / RESTORE ----
+
+async function exportBackup() {
+  let backup;
+  try {
+    backup = await dbExportBackup();
+  } catch (err) {
+    alert('Backup fehlgeschlagen: ' + err.message);
+    return;
+  }
+  // Blob statt data: URI — Fotos können gross sein und die URI-Länge sprengen.
+  const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `modlog-backup_${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function triggerImport() {
+  document.getElementById('restore-input').click();
+}
+
+async function importBackup(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  if (!confirm('Aktuelle Daten werden überschrieben.')) return;
+
+  try {
+    const obj = JSON.parse(await file.text());
+    await dbImportBackup(obj);
+    activeFz = 'all';
+    activeKat = 'all';
+    clearSearch();
+    renderStats();
+    alert('Wiederherstellung erfolgreich.');
+  } catch (err) {
+    alert('Wiederherstellung fehlgeschlagen: ' + err.message);
+  }
+}
+
 // ---- FAHRZEUGE ----
 
 function renderFahrzeuge() {

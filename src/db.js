@@ -331,6 +331,49 @@ function dbReplaceAllPhotos(records) {
   }));
 }
 
+// ---- Backup / Restore ----
+
+/**
+ * Baut ein vollständiges Backup-Objekt (Fahrzeuge + Einträge + Fotos).
+ * @returns {Promise<object>}
+ */
+function dbExportBackup() {
+  return dbGetAllPhotos().catch(() => []).then(photos => ({
+    app: 'ModLog',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    fahrzeuge: db.fahrzeuge,
+    eintraege: db.eintraege,
+    photos,
+  }));
+}
+
+/**
+ * Prüft die Grundstruktur eines Backup-Objekts.
+ * @param {any} obj
+ * @returns {boolean}
+ */
+function dbValidateBackup(obj) {
+  return !!obj && typeof obj === 'object'
+    && Array.isArray(obj.fahrzeuge)
+    && Array.isArray(obj.eintraege)
+    && (obj.photos === undefined || Array.isArray(obj.photos));
+}
+
+/**
+ * Ersetzt den kompletten Datenbestand durch ein Backup (verlustfrei).
+ * @param {object} obj
+ * @returns {Promise<void>}
+ */
+function dbImportBackup(obj) {
+  if (!dbValidateBackup(obj)) {
+    return Promise.reject(new Error('Ungültiges Backup-Format.'));
+  }
+  db = { fahrzeuge: obj.fahrzeuge, eintraege: obj.eintraege };
+  dbSave(db);
+  return dbReplaceAllPhotos(obj.photos || []);
+}
+
 // ---- Seed-Daten (Demo) ----
 /**
  * Befüllt die DB mit Beispieldaten wenn leer.
